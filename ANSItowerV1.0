@@ -1,0 +1,166 @@
+#include <stdint.h>
+#include <stdio.h>
+#include <avr/io.h>
+#include <avr/interrupt.h>
+#include <util/delay.h>
+#include <cpu_speed.h>
+#include <macros.h>
+#include <sprite.h>
+#include <graphics.h>
+#include <lcd.h>
+#include "lcd_model.h" 
+
+//Timer
+#define FREQUENCY (3)
+#define PRESCALE (1024.0)
+
+void countdown( void ){
+	clear_screen();
+	for (int i = 0; i < 90; i = i + 10){
+		for (int j = 0; j < 90; j = j + 10){
+			draw_string(i, j, "3", FG_COLOUR);
+		}
+	}
+	show_screen();
+	_delay_ms(300);
+	clear_screen();
+	for (int i = 0; i < 90; i = i + 10){
+		for (int j = 0; j < 90; j = j + 10){
+			draw_string(i, j, "2", FG_COLOUR);
+		}
+	}
+	show_screen();
+	_delay_ms(300);
+	clear_screen();
+	for (int i = 0; i < 90; i = i + 10){
+		for (int j = 0; j < 90; j = j + 10){
+			draw_string(i, j, "1", FG_COLOUR);
+		}
+	}
+	show_screen();
+	_delay_ms(300);
+}
+//protagonist  
+#define protag_w 8
+#define protag_h 11
+uint8_t protagImage[] = {
+	0b00101000,
+	0b00111000,
+	0b00101000,
+	0b00111000,
+	0b00000000,
+	0b11111110,
+	0b10101010,
+	0b10111010,
+	0b00101000,
+	0b00101000,
+	0b00101000,
+};
+Sprite protag;
+
+
+void draw_protag( void ){
+	int protag_x = (LCD_X / 2) - protag_w;
+	int protag_y = 27;
+	sprite_init(&protag, protag_x, protag_y, protag_w, protag_h, protagImage);
+	sprite_draw(&protag);
+}
+
+//Monster
+uint8_t monsterImage[7] = {
+	0b00111000,
+	0b01111100,
+	0b01010100,
+	0b01111100,
+	0b01111100,
+	0b01010100,
+	0b01010100,
+};
+uint8_t monsterDirect[7];
+uint8_t x_monster, y_monster;
+void setup_monster( void ){
+	for (int i = 0; i < 7; i++){
+		for (int j = 0; j < 7; j++){
+			uint8_t bit_val = BIT_VALUE(monsterImage[i], (7-j));
+			WRITE_BIT(monsterDirect[j], i, bit_val);
+		}
+	}
+	x_monster = (LCD_X - 8);
+	y_monster = 28;
+}
+void draw_monster( void ){
+	LCD_CMD(lcd_set_function, lcd_instr_basic | lcd_addr_horizontal);
+	LCD_CMD(lcd_set_x_addr, x_monster);
+	LCD_CMD(lcd_set_y_addr, y_monster / 8);
+	for (int i = 0; i < 7; i++){
+		LCD_DATA(monsterDirect[i]);
+	}	
+}
+//Key 
+uint8_t keyImage[3] = {
+	0b11100000,
+	0b10111110,
+	0b11101010,
+};
+uint8_t keyDirect[3];
+uint8_t x_key, y_key;
+void setup_key( void ){
+	for (int i = 0; i < 3; i++){
+		for (int j = 0; j < 3; j++){
+			uint8_t bit_val = BIT_VALUE(keyImage[i], (7-j));
+			WRITE_BIT(keyDirect[j], i, bit_val);
+		}
+	}
+	x_key = (LCD_X - 8) - 76;
+	y_key = 28;
+}
+void draw_key( void ){
+	LCD_CMD(lcd_set_function, lcd_instr_basic | lcd_addr_horizontal);
+	LCD_CMD(lcd_set_x_addr, x_key);
+	LCD_CMD(lcd_set_y_addr, y_key / 8);
+	for (int i = 0; i < 7; i++){
+		LCD_DATA(keyDirect[i]);
+	}
+}
+//Main game setup and process	
+void setup( void ) {
+	set_clock_speed(CPU_8MHz);
+	lcd_init(LCD_DEFAULT_CONTRAST);
+	CLEAR_BIT(DDRF, 6); //left button
+	CLEAR_BIT(DDRF, 5); //right button
+	CLEAR_BIT(DDRB, 1); //left joystick
+	CLEAR_BIT(DDRD, 0); //right joystick
+	CLEAR_BIT(DDRD, 1); //up joystick
+	CLEAR_BIT(DDRB, 7); //down joystick
+	//Menu Screen
+	draw_string(20, 0, "ANSI Tower", FG_COLOUR);
+	draw_string(25, 8, "Jai Hunt", FG_COLOUR);
+	draw_string(25, 16, "10006869", FG_COLOUR);
+	draw_string(0, 40, "Press SW2", FG_COLOUR);
+	show_screen();	
+}
+
+ void process ( void ) {
+	 // Start menu
+	 if (BIT_IS_SET(PINF, 5)|| BIT_IS_SET(PINF, 6)){
+		lcd_clear();
+		countdown();
+		lcd_clear();
+		draw_protag();
+		setup_monster();
+		draw_monster();
+		setup_key();
+		draw_key();
+	}
+}
+
+int main( void ) {
+		setup();
+
+	for ( ;; ) {
+		process();
+		_delay_ms(10);
+	}
+
+	return 0;
+}
